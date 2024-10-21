@@ -5,6 +5,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from pymongo import MongoClient
 from keras.models import load_model
+from sklearn.preprocessing import MinMaxScaler
 
 # --- MongoDB Connection ---
 MONGO_URI = "mongodb://localhost:27017/"
@@ -12,7 +13,7 @@ client = MongoClient(MONGO_URI)
 db = client["stock_market_db"]
 stock_data_collection = db["stock_data"]
 stock_info_collection = db["stock_info"]
-commodities_collection = db["commodities_data"]  # Collection for commodity prices
+commodities_collection = db["commodities_data"]
 
 # --- App Styling ---
 st.set_page_config(layout="wide")
@@ -26,7 +27,9 @@ st.markdown("""
         padding: 0px !important; 
     }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
 # --- Header ---
 st.title('Stock Market Analyzer')
@@ -44,7 +47,6 @@ with col1:
     stock_symbol = st.selectbox('Select Stock', stock_symbols)
 
 # --- Data Fetching (from MongoDB) ---
-data = None
 try:
     data_from_db = stock_data_collection.find_one({"Symbol": stock_symbol})
     if data_from_db:
@@ -82,7 +84,7 @@ with col2:
 
 # --- Historical Data Chart ---
 st.subheader('Select Parameters for Historical Data')
-col3, col4, col5, col6, col7 = st.columns(5)  # Added columns for each checkbox
+col3, col4, col5, col6, col7 = st.columns(5)
 with col3:
     show_close = st.checkbox('Closing Price', value=True)
 with col4:
@@ -133,7 +135,6 @@ st.plotly_chart(fig, use_container_width=True)
 
 # --- Sentiment and Stock Price Graphs ---
 st.subheader('Sentiment and Stock Price Correlation')
-
 try:
     news_from_db = db["news_data"].find({"symbol": stock_symbol})
     news_df = pd.DataFrame(list(news_from_db))
@@ -186,7 +187,7 @@ try:
 
         # Create an "Open" hyperlink column
         news_df['Open'] = news_df['link'].apply(lambda link: f"<a href='{link}' target='_blank'>Open</a>")
-        news_df = news_df.drop(columns=['link'])  # Remove the original link column
+        news_df = news_df.drop(columns=['link'])
 
         # Display news in a regular Streamlit table with "Open" hyperlinks
         st.write(news_df.style.format({"sentiment": "{:.2f}"})
@@ -200,3 +201,74 @@ try:
         st.write("No recent news found for this stock.")
 except Exception as e:
     st.error(f"Error fetching/displaying news: {e}")
+
+# --- Prediction Table ---
+st.subheader('Predictions')
+
+if model:
+    try:
+        # Prepare prediction data
+        data_train = data[['Close']][0: int(len(data) * 0.80)]
+        data_test = data[['Close']][int(len(data) * 0.80):]
+
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        
+        # Fit the scaler on the training data
+        data_train_scaled = scaler.fit_transform(data_train)  
+
+        # Get the last 100 days of the training data
+        past_100_days = data_train.tail(100)
+
+        # Concatenate the last 100 days of training data with the test data
+        data_test = pd.concat([past_100_days, data_test], ignore_index=True)
+        
+        # Scale the test data
+        data_test_scaled = scaler.transform(data_test)  
+
+        x_test = []
+        y_test = []
+
+        # Create sequences of 100 days for the test data
+        for i in range(100, data_test_scaled.shape[0]):
+            x_test.append(data_test_scaled[i-100:i])
+            y_test.append(data_test_scaled[i, 0])
+
+        x_test, y_test = np.array(x_test), np.array(y_test)
+        x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))  # Reshape for LSTM
+
+        # Make predictions
+        predictions = model.predict(x_test)
+
+        # Inverse transform to get actual prices
+        predictions = scaler.inverse_transform(predictions)
+        y_test = scaler.inverse_transform(y_test.reshape(-1, 1))
+
+        # Create a DataFrame for actual and predicted values
+        prediction_df = pd.DataFrame({
+            'Actual': y_test.flatten(),
+            'Predicted': predictions.flatten()
+        })
+
+        # Display the prediction table
+        st.write(prediction_df)
+
+        # --- Plot Predicted vs Actual Prices ---
+        prediction_dates = data.index[int(len(data) * 0.80) + 100:]  # Corresponding dates for predictions
+        fig_prediction = go.Figure()
+        fig_prediction.add_trace(go.Scatter(x=prediction_dates, y=y_test.flatten(), mode='lines', name='Actual Price'))
+        fig_prediction.add_trace(go.Scatter(x=prediction_dates, y=predictions.flatten(), mode='lines', name='Predicted Price'))
+        
+        fig_prediction.update_layout(
+            title=f'{stock_symbol} Actual vs Predicted Prices',
+            xaxis_title='Date',
+            yaxis_title='Price',
+            template="plotly_white",
+            height=600
+        )
+
+        st.plotly_chart(fig_prediction, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Error making or displaying predictions: {e}")
+else:
+    st.warning("No model loaded. Cannot make predictions.")
