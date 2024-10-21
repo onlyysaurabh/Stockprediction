@@ -1,0 +1,19 @@
+2024-10-21 20:16:17,899 - WARNING - From C:\Users\skylap\AppData\Local\Programs\Python\Python312\Lib\site-packages\tf_keras\src\losses.py:2976: The name tf.losses.sparse_softmax_cross_entropy is deprecated. Please use tf.compat.v1.losses.sparse_softmax_cross_entropy instead.
+
+2024-10-21 20:16:18,585 - WARNING - From C:\Users\skylap\AppData\Local\Programs\Python\Python312\Lib\site-packages\tf_keras\src\backend.py:873: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
+
+2024-10-21 20:16:26,055 - WARNING - tracked_stocks.json not found. Creating a new file.
+2024-10-21 20:16:34,340 - INFO - News data for MMM stored in MongoDB.
+2024-10-21 20:16:38,256 - INFO - News data for AOS stored in MongoDB.
+2024-10-21 20:16:42,357 - INFO - News data for ABT stored in MongoDB.
+2024-10-21 20:16:46,357 - INFO - News data for ABBV stored in MongoDB.
+2024-10-21 20:16:50,327 - INFO - News data for ACN stored in MongoDB.
+2024-10-21 20:16:54,768 - INFO - News data for ADBE stored in MongoDB.
+2024-10-21 20:16:59,448 - INFO - News data for AMD stored in MongoDB.
+2024-10-21 20:17:04,036 - INFO - News data for AES stored in MongoDB.
+2024-10-21 20:17:08,236 - INFO - News data for AFL stored in MongoDB.
+2024-10-21 20:17:12,196 - INFO - News data for A stored in MongoDB.
+2024-10-21 20:17:16,806 - INFO - News data for APD stored in MongoDB.
+2024-10-21 20:17:20,778 - INFO - News data for ABNB stored in MongoDB.
+2024-10-21 20:17:24,657 - INFO - News data for AKAM stored in MongoDB.
+2024-10-21 20:17:28,839 - INFO - News data for ALB stored in MongoDB.
