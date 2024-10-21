@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from pymongo import MongoClient
 from keras.models import load_model
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -30,9 +30,7 @@ st.markdown("""
         padding: 0px !important; 
     }
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+    """, unsafe_allow_html=True)
 
 # --- Header ---
 st.title('Stock Market Analyzer')
@@ -136,8 +134,8 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# --- Sentiment and Stock Price Graphs ---
-st.subheader('Sentiment and Stock Price Correlation')
+# --- Sentiment Graph ---
+st.subheader('Sentiment Over Time')
 try:
     news_from_db = db["news_data"].find({"symbol": stock_symbol})
     news_df = pd.DataFrame(list(news_from_db))
@@ -146,10 +144,7 @@ try:
         news_df['date'] = pd.to_datetime(news_df['date'])
         news_df = news_df.sort_values(by='date')
 
-        sentiment_dates = news_df['date']
-        filtered_data = data[data.index.isin(sentiment_dates)]
-
-        # Create subplots
+        # Create sentiment plot
         fig_sentiment = go.Figure()
         fig_sentiment.add_trace(go.Scatter(x=news_df['date'], y=news_df['sentiment'], mode='lines', name='Sentiment Score'))
         fig_sentiment.update_layout(
@@ -159,24 +154,11 @@ try:
             template="plotly_white",
         )
 
-        fig_stock = go.Figure()
-        fig_stock.add_trace(go.Scatter(x=filtered_data.index, y=filtered_data['Close'], mode='lines', name='Closing Price'))
-        fig_stock.update_layout(
-            title=f'{stock_symbol} Stock Price Over Time',
-            xaxis_title='Date',
-            yaxis_title='Price',
-            template="plotly_white",
-        )
-
-        # Display plots side by side
-        col1, col2 = st.columns(2)
-        with col1:
-            st.plotly_chart(fig_sentiment, use_container_width=True)
-        with col2:
-            st.plotly_chart(fig_stock, use_container_width=True)
+        # Display sentiment plot
+        st.plotly_chart(fig_sentiment, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Error fetching sentiment data: {e}")
+    st.error(f"Error retrieving data: {e}")
 
 # --- News and Sentiment Display ---
 st.subheader('Recent News and Sentiment')
@@ -262,21 +244,12 @@ if model:
         # Generate confusion matrix
         cm = confusion_matrix(actual_movement, predicted_movement)
 
-        # Visualize confusion matrix using Seaborn
-        fig_cm, ax = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax, 
-                    xticklabels=['Down', 'Up'], yticklabels=['Down', 'Up'])
-        ax.set_xlabel('Predicted')
-        ax.set_ylabel('Actual')
-        ax.set_title('Confusion Matrix')
-
-        # Display the confusion matrix in Streamlit
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(prediction_df)
-
-        with col2:
-            st.pyplot(fig_cm)
+        # Calculate performance metrics
+        report = classification_report(actual_movement, predicted_movement, output_dict=True)
+        sensitivity = report['1']['recall']
+        specificity = report['0']['recall']
+        f1 = report['1']['f1-score']
+        accuracy = accuracy_score(actual_movement, predicted_movement)
 
         # --- Plot Predicted vs Actual Prices ---
         prediction_dates = data.index[int(len(data) * 0.80) + 100:]  # Corresponding dates for predictions
@@ -293,6 +266,29 @@ if model:
         )
 
         st.plotly_chart(fig_prediction, use_container_width=True)
+
+        # Visualize confusion matrix using Seaborn
+        fig_cm, ax = plt.subplots()
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax, 
+                    xticklabels=['Down', 'Up'], yticklabels=['Down', 'Up'])
+        ax.set_xlabel('Predicted')
+        ax.set_ylabel('Actual')
+        ax.set_title('Confusion Matrix')
+
+        # Display the confusion matrix and metrics in Streamlit
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(prediction_df)
+
+        with col2:
+            st.pyplot(fig_cm)
+
+        # Display performance metrics
+        st.subheader('Performance Metrics')
+        st.write(f"**Sensitivity (Recall for Up):** {sensitivity:.2f}")
+        st.write(f"**Specificity (Recall for Down):** {specificity:.2f}")
+        st.write(f"**F1 Score:** {f1:.2f}")
+        st.write(f"**Accuracy:** {accuracy:.2f}")
 
     except Exception as e:
         st.error(f"Error making or displaying predictions: {e}")
