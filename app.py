@@ -6,6 +6,9 @@ import plotly.graph_objects as go
 from pymongo import MongoClient
 from keras.models import load_model
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # --- MongoDB Connection ---
 MONGO_URI = "mongodb://localhost:27017/"
@@ -143,7 +146,6 @@ try:
         news_df['date'] = pd.to_datetime(news_df['date'])
         news_df = news_df.sort_values(by='date')
 
-        # Use only the dates from the sentiment data
         sentiment_dates = news_df['date']
         filtered_data = data[data.index.isin(sentiment_dates)]
 
@@ -249,8 +251,32 @@ if model:
             'Predicted': predictions.flatten()
         })
 
-        # Display the prediction table
-        st.write(prediction_df)
+        # Create binary labels for confusion matrix
+        actual_movement = np.where(np.diff(y_test.flatten()) > 0, 1, 0)  # 1 for up, 0 for down
+        predicted_movement = np.where(np.diff(predictions.flatten()) > 0, 1, 0)
+
+        # Align lengths for confusion matrix
+        actual_movement = actual_movement[1:]  # Adjust to match the length
+        predicted_movement = predicted_movement[1:]
+
+        # Generate confusion matrix
+        cm = confusion_matrix(actual_movement, predicted_movement)
+
+        # Visualize confusion matrix using Seaborn
+        fig_cm, ax = plt.subplots()
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax, 
+                    xticklabels=['Down', 'Up'], yticklabels=['Down', 'Up'])
+        ax.set_xlabel('Predicted')
+        ax.set_ylabel('Actual')
+        ax.set_title('Confusion Matrix')
+
+        # Display the confusion matrix in Streamlit
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(prediction_df)
+
+        with col2:
+            st.pyplot(fig_cm)
 
         # --- Plot Predicted vs Actual Prices ---
         prediction_dates = data.index[int(len(data) * 0.80) + 100:]  # Corresponding dates for predictions
